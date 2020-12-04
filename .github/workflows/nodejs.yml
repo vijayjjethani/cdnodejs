@@ -1,0 +1,62 @@
+name: Deploy Node.js to Azure Web App
+
+on:
+  push:
+    branches:
+      - HOL
+    paths:
+    - 'README.md' 
+# CONFIGURATION
+# For help, go to https://github.com/Azure/Actions
+#
+# 1. Set up the following secrets in your repository:
+#   DEPLOYGITHUB
+#
+# 2. Change these variables for your configuration:
+env:
+  AZURE_WEBAPP_NAME: appservicenodejs            # set this to your application's name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'                 # set this to the path to your web app project, defaults to the repository root
+  NODE_VERSION: '12.x'                           # set this to the node version to use
+  AZURE_RESOURCE_GROUP: handsonlab               # set this to your Azure Resource group's name  
+  AZURE_LOCATION: eastus                         # set this to your azure resource group location   
+  AZURE_APP_PLAN: nodejsplan                     # set this to your App service plan's name
+  CONTAINER_REGISTRY: vijaygithubaction.azurecr.io  # set this to Container Registry name
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Use Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    - name: npm install, build, and test
+      run: |
+        # Build and test the project, then
+        # deploy to Azure Web App.
+        npm install
+        npm run build --if-present
+        npm run test --if-present
+ # Authentication
+    - uses: azure/login@v1
+      with:
+        creds: ${{ secrets.DEPLOYGITHUB  }}
+        
+# Provision a new Web App
+    - name: Azure CLI script to create a new Web App for Container
+      uses: azure/CLI@v1
+      with:
+        azcliversion: latest
+        inlineScript: |
+          az group create --name ${{ env.AZURE_RESOURCE_GROUP }} --location eastus
+          az appservice plan create --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AZURE_APP_PLAN }} --is-linux --sku S1
+          az webapp create --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --plan ${{ env.AZURE_APP_PLAN }} --name ${{ env.AZURE_WEBAPP_NAME }}  --runtime "NODE|12-lts"
+          
+#Deploy To Webapp          
+    - name: 'Deploy to Azure WebApp'
+      uses: azure/webapps-deploy@v2
+      with: 
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
